@@ -6,7 +6,7 @@ A lightweight Node.js web app for chatting with your local Ollama model.
 
 - Node.js 18+
 - [Ollama](https://ollama.com) running locally
-- `got-oss:120b-cloud` model pulled: `ollama pull gpt-oss:120b-cloud`
+- `gpt-oss:120b-cloud` model pulled: `ollama pull gpt-oss:120b-cloud`
 
 ## Quick Start
 
