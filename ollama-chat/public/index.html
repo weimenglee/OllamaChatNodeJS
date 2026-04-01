@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ollama Chat — gpt-oss:120b</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0d10;
+      --surface:   #13161c;
+      --border:    #1f2430;
+      --accent:    #00e5b0;
+      --accent2:   #7b61ff;
+      --text:      #e2e8f0;
+      --muted:     #5a6478;
+      --user-bg:   #1a1f2e;
+      --ai-bg:     #111318;
+      --danger:    #ff4d6d;
+      --radius:    12px;
+      --font-ui:   'Syne', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-ui); }
+
+    /* ── Layout ── */
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .logo h1 { font-size: 1rem; font-weight: 800; letter-spacing: -0.5px; }
+    .logo span { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); background: rgba(0,229,176,0.1); padding: 2px 8px; border-radius: 4px; }
+
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    #status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    #status-dot.online  { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    #status-dot.offline { background: var(--danger); }
+
+    #model-select {
+      background: var(--border);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      outline: none;
+    }
+    #model-select:focus { border-color: var(--accent); }
+
+    .btn-icon {
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; padding: 6px; border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+      font-size: 16px;
+    }
+    .btn-icon:hover { color: var(--text); background: var(--border); }
+
+    /* ── Messages ── */
+    #messages {
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg {
+      display: flex;
+      gap: 12px;
+      animation: fadeUp 0.25s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0; margin-top: 2px;
+    }
+    .msg.user   .avatar { background: linear-gradient(135deg, var(--accent2), #b388ff); }
+    .msg.system .avatar { background: linear-gradient(135deg, var(--accent), #00b4d8); }
+
+    .bubble {
+      max-width: 78%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      line-height: 1.65;
+      font-size: 0.92rem;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .msg.user   .bubble { background: var(--user-bg); border: 1px solid #2a3150; border-top-right-radius: 2px; }
+    .msg.system .bubble { background: var(--ai-bg);   border: 1px solid var(--border); border-top-left-radius: 2px; }
+
+    /* code blocks inside bubbles */
+    .bubble code {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+      background: rgba(255,255,255,0.06);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .bubble pre {
+      background: #0d0f14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    .bubble pre code { background: none; padding: 0; }
+
+    .typing-cursor {
+      display: inline-block;
+      width: 8px; height: 14px;
+      background: var(--accent);
+      border-radius: 2px;
+      animation: blink 0.8s infinite;
+      vertical-align: middle;
+      margin-left: 2px;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+    .stats {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 6px;
+      padding-left: 4px;
+    }
+
+    /* Welcome screen */
+    #welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      color: var(--muted);
+      text-align: center;
+      padding: 24px;
+    }
+    #welcome .big-icon { font-size: 48px; margin-bottom: 8px; }
+    #welcome h2 { font-size: 1.3rem; font-weight: 800; color: var(--text); }
+    #welcome p { font-size: 0.875rem; max-width: 380px; line-height: 1.6; }
+
+    /* ── Input ── */
+    .input-area {
+      padding: 16px 24px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      transition: border-color 0.2s;
+    }
+    .input-row:focus-within { border-color: var(--accent); }
+
+    #user-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 0.93rem;
+      resize: none;
+      line-height: 1.5;
+      max-height: 180px;
+      min-height: 24px;
+    }
+    #user-input::placeholder { color: var(--muted); }
+
+    #send-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      width: 36px; height: 36px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, opacity 0.15s;
+      flex-shrink: 0;
+    }
+    #send-btn:hover:not(:disabled) { transform: scale(1.08); }
+    #send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .input-hint {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 8px;
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+
+    /* Error toast */
+    #toast {
+      position: fixed;
+      bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--danger);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 100;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🦙</div>
+      <h1>Ollama Chat</h1>
+      <span id="model-label">gpt-oss:120b-cloud</span>
+    </div>
+    <div class="header-right">
+      <div id="status-dot" title="Ollama status"></div>
+      <select id="model-select" title="Switch model"></select>
+      <button class="btn-icon" id="clear-btn" title="Clear chat">🗑</button>
+    </div>
+  </header>
+
+  <div id="messages">
+    <div id="welcome">
+      <div class="big-icon">🦙</div>
+      <h2>gpt-oss:120b-cloud</h2>
+      <p>Ask anything. Your conversation stays local — powered by Ollama running on your machine.</p>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-row">
+      <textarea id="user-input" placeholder="Ask something…" rows="1"></textarea>
+      <button id="send-btn" title="Send (Enter)">➤</button>
+    </div>
+    <div class="input-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for newline</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const messagesEl = document.getElementById("messages");
+  const welcomeEl  = document.getElementById("welcome");
+  const inputEl    = document.getElementById("user-input");
+  const sendBtn    = document.getElementById("send-btn");
+  const clearBtn   = document.getElementById("clear-btn");
+  const modelSel   = document.getElementById("model-select");
+  const modelLabel = document.getElementById("model-label");
+  const statusDot  = document.getElementById("status-dot");
+  const toastEl    = document.getElementById("toast");
+
+  let history = [];   // [{role, content}]
+  let streaming = false;
+  let currentModel = "gpt-oss:120b-cloud";
+
+  // ── Health check ──
+  async function checkHealth() {
+    try {
+      const res = await fetch("/api/health");
+      const data = await res.json();
+      statusDot.className = data.status === "ok" ? "online" : "offline";
+      return data;
+    } catch {
+      statusDot.className = "offline";
+      return null;
+    }
+  }
+
+  // ── Load models ──
+  async function loadModels() {
+    try {
+      const res = await fetch("/api/models");
+      const data = await res.json();
+      modelSel.innerHTML = "";
+      (data.models || ["gpt-oss:120b-cloud"]).forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m; opt.textContent = m;
+        if (m === currentModel) opt.selected = true;
+        modelSel.appendChild(opt);
+      });
+    } catch {}
+  }
+
+  modelSel.addEventListener("change", () => {
+    currentModel = modelSel.value;
+    modelLabel.textContent = currentModel;
+  });
+
+  // ── Toast ──
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    setTimeout(() => toastEl.classList.remove("show"), 3500);
+  }
+
+  // ── Render message ──
+  function renderMessage(role, content = "", done = false) {
+    if (welcomeEl) welcomeEl.remove();
+
+    const wrap = document.createElement("div");
+    wrap.className = `msg ${role}`;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = role === "user" ? "👤" : "🤖";
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = formatContent(content);
+
+    if (role === "assistant" && !done) {
+      const cursor = document.createElement("span");
+      cursor.className = "typing-cursor";
+      cursor.id = "cursor";
+      bubble.appendChild(cursor);
+    }
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    return { wrap, bubble };
+  }
+
+  function formatContent(text) {
+    // Very light markdown: code blocks and inline code
+    return text
+      .replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${escHtml(code.trim())}</code></pre>`)
+      .replace(/`([^`]+)`/g, (_, code) => `<code>${escHtml(code)}</code>`);
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  // ── Send ──
+  async function send() {
+    const text = inputEl.value.trim();
+    if (!text || streaming) return;
+
+    streaming = true;
+    sendBtn.disabled = true;
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+
+    history.push({ role: "user", content: text });
+    renderMessage("user", text, true);
+
+    const { bubble } = renderMessage("assistant", "", false);
+    let accumulated = "";
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history, model: currentModel }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Request failed");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split("\n").filter(l => l.startsWith("data: "));
+
+        for (const line of lines) {
+          const json = JSON.parse(line.slice(6));
+
+          if (json.error) throw new Error(json.error);
+
+          if (json.content) {
+            accumulated += json.content;
+            bubble.innerHTML = formatContent(accumulated);
+            const cursor = document.createElement("span");
+            cursor.className = "typing-cursor";
+            bubble.appendChild(cursor);
+          }
+
+          if (json.done) {
+            // Remove cursor, add stats
+            bubble.innerHTML = formatContent(accumulated);
+            if (json.stats?.eval_count) {
+              const stats = document.createElement("div");
+              stats.className = "stats";
+              const ms = Math.round((json.stats.total_duration || 0) / 1e6);
+              stats.textContent = `${json.stats.eval_count} tokens · ${ms}ms`;
+              bubble.parentElement.appendChild(stats);
+            }
+          }
+        }
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      history.push({ role: "assistant", content: accumulated });
+
+    } catch (err) {
+      bubble.innerHTML = `<span style="color:var(--danger)">⚠ ${err.message}</span>`;
+      showToast(err.message);
+    } finally {
+      streaming = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  // ── Clear ──
+  clearBtn.addEventListener("click", () => {
+    history = [];
+    messagesEl.innerHTML = "";
+    const w = document.createElement("div");
+    w.id = "welcome"; w.className = "";
+    w.innerHTML = `
+      <div class="big-icon">🦙</div>
+      <h2>gpt-oss:120b-cloud</h2>
+      <p>Ask anything. Your conversation stays local — powered by Ollama running on your machine.</p>`;
+    messagesEl.appendChild(w);
+  });
+
+  // ── Input auto-resize ──
+  inputEl.addEventListener("input", () => {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + "px";
+  });
+
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  sendBtn.addEventListener("click", send);
+
+  // ── Init ──
+  (async () => {
+    const health = await checkHealth();
+    await loadModels();
+    if (!health || health.status !== "ok") {
+      showToast("Cannot reach Ollama — is it running on port 11434?");
+    }
+  })();
+</script>
+</body>
+</html>
