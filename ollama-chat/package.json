@@ -1,7 +1,7 @@
 {
   "name": "ollama-chat",
   "version": "1.0.0",
-  "description": "Web chat UI for Ollama got-oss:120b-cloud",
+  "description": "Web chat UI for Ollama gpt-oss:120b-cloud",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
